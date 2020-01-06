@@ -7,57 +7,62 @@
 struct timeval tp;
 long int ms;
 int last_change;
+int change;
 
-int getTime(){
+int getCurrentTimeMS(){
     gettimeofday(&tp, NULL);
     ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
     return ms;
 }
 
+void printEvent(XEvent event){
+      printf("%s%x\n",(event.type == KeyPress?"+":"-"), event.xkey.keycode);
+}
+
 int main()
 {
-    Display *display = XOpenDisplay(getenv("DISPLAY"));
-    Window window;
-    XEvent event;
-    Window root = DefaultRootWindow(display);
-    Window curFocus;
-    int revert;
-    /* open connection with the server */
- 
-    XGetInputFocus (display, &curFocus, &revert);
-    XSelectInput(display, curFocus, KeyPressMask | KeyReleaseMask | FocusChangeMask);
- 
+  Display *display;
+  Window window;
+  XEvent event;
+  int s;
+
+  /* open connection with the server */
+  display = XOpenDisplay(NULL);
+  if (display == NULL){
+    fprintf(stderr, "Cannot open display\n");
+    exit(1);
+  }
+
+  s = DefaultScreen(display);
+  
+  /* create window */
+  window = XCreateSimpleWindow(display, RootWindow(display, s), 10, 10, 200, 200, 1,
+                               BlackPixel(display, s), WhitePixel(display, s));
+
+  /* select kind of events we are interested in */
+  XSelectInput(display, window, KeyPressMask | KeyReleaseMask);
+  /* map (show) the window */
+  XMapWindow(display, window);
+
     /* map (show) the window */
  
     /* event loop */
-    while (1)
-    {
+    last_change = getCurrentTimeMS();
+    while (1){
         XNextEvent(display, &event);
+        
         /* keyboard events */
-        if (event.type == KeyPress)
-        {
-            last_change = getTime();
-            printf( "KeyPress: %x\n", event.xkey.keycode );
+        if (event.type == KeyPress || event.type == KeyRelease){
+          
+          /* exit on ESC key press */
+          if ( event.xkey.keycode == 0x09 )
+              break;
+          
+          change = getCurrentTimeMS();
+          printf("sleep %dms\n", change-last_change);
+          last_change = change;
+          printEvent(event);
 
-            /* exit on ESC key press */
-            if ( event.xkey.keycode == 0x09 )
-                break;
-        }
-        else if (event.type == KeyRelease)
-        {
-            last_change = getTime();
-            printf( "KeyRelease: %x\n", event.xkey.keycode );
-        }
-        else if (event.type == FocusOut)
-        {
-                printf("%s\n", "Focus changed!");
-                if (curFocus != root)
-                    XSelectInput(display, curFocus, 0);
-                XGetInputFocus (display, &curFocus, &revert);
-
-                if (curFocus == PointerRoot)
-                    curFocus = root;
-                XSelectInput(display, curFocus, KeyPressMask|KeyReleaseMask|FocusChangeMask);
         }
     }
 
