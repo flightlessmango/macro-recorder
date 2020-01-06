@@ -3,10 +3,12 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <iostream>
+#include <vector>
 
 struct timeval tp;
 long int ms;
 int last_change;
+std::vector<int> keyArray;
 
 int getTime(){
     gettimeofday(&tp, NULL);
@@ -32,12 +34,21 @@ int main()
     /* event loop */
     while (1)
     {
+        for (size_t i = 0; i < keyArray.size(); i++)
+        {
+            printf("%i ", keyArray[i] );
+            if (i == keyArray.size() - 1)
+                printf("\n");
+        }
+        
+        
         XNextEvent(display, &event);
         /* keyboard events */
         if (event.type == KeyPress)
         {
             last_change = getTime();
-            printf( "KeyPress: %x\n", event.xkey.keycode );
+            keyArray.push_back(event.xkey.keycode);
+            // printf( "KeyPress: %x\n", event.xkey.keycode );
 
             /* exit on ESC key press */
             if ( event.xkey.keycode == 0x09 )
@@ -46,11 +57,16 @@ int main()
         else if (event.type == KeyRelease)
         {
             last_change = getTime();
-            printf( "KeyRelease: %x\n", event.xkey.keycode );
+            for (size_t i = 0; i < keyArray.size(); i++)
+            {
+                if (keyArray[i] == event.xkey.keycode)
+                    keyArray.erase(keyArray.begin() + i);
+            }
+            // printf( "KeyRelease: %x\n", event.xkey.keycode );
         }
         else if (event.type == FocusOut)
         {
-                printf("%s\n", "Focus changed!");
+                // printf("%s\n", "Focus changed!");
                 if (curFocus != root)
                     XSelectInput(display, curFocus, 0);
                 XGetInputFocus (display, &curFocus, &revert);
