@@ -1,17 +1,17 @@
 #include <X11/Xlib.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <iostream>
-#include "X11/keysym.h"
 
-Display *dpy = XOpenDisplay(":0");
+struct timeval tp;
+long int ms;
+int last_change;
 
-bool key_is_pressed(KeySym ks) {
-    char keys_return[32];
-    XQueryKeymap(dpy, keys_return);
-    KeyCode kc2 = XKeysymToKeycode(dpy, ks);
-    bool isPressed = !!(keys_return[kc2 >> 3] & (1 << (kc2 & 7)));
-    return isPressed;
+int getTime(){
+    gettimeofday(&tp, NULL);
+    ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    return ms;
 }
 
 int main()
