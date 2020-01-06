@@ -1,4 +1,6 @@
 #include <X11/Xlib.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
 #include "X11/keysym.h"
 
@@ -12,16 +14,55 @@ bool key_is_pressed(KeySym ks) {
     return isPressed;
 }
 
-bool ctrl_is_pressed() {
-    return key_is_pressed(XK_Control_L) || key_is_pressed(XK_F12);
-}
+int main()
+{
+    Display *display = XOpenDisplay(getenv("DISPLAY"));
+    Window window;
+    XEvent event;
+    Window root = DefaultRootWindow(display);
+    Window curFocus;
+    int revert;
+    /* open connection with the server */
+ 
+    XGetInputFocus (display, &curFocus, &revert);
+    XSelectInput(display, curFocus, KeyPressMask | KeyReleaseMask | FocusChangeMask);
+ 
+    /* map (show) the window */
+ 
+    /* event loop */
+    while (1)
+    {
+        XNextEvent(display, &event);
+        /* keyboard events */
+        if (event.type == KeyPress)
+        {
+            last_change = getTime();
+            printf( "KeyPress: %x\n", event.xkey.keycode );
 
-int main(int argc, char **argv) {
-  while(1){
-        if (ctrl_is_pressed() == 1) {
-          std::cout << ctrl_is_pressed() << std::endl;
+            /* exit on ESC key press */
+            if ( event.xkey.keycode == 0x09 )
+                break;
         }
-  }
+        else if (event.type == KeyRelease)
+        {
+            last_change = getTime();
+            printf( "KeyRelease: %x\n", event.xkey.keycode );
+        }
+        else if (event.type == FocusOut)
+        {
+                printf("%s\n", "Focus changed!");
+                if (curFocus != root)
+                    XSelectInput(display, curFocus, 0);
+                XGetInputFocus (display, &curFocus, &revert);
 
-    return (0);
-};
+                if (curFocus == PointerRoot)
+                    curFocus = root;
+                XSelectInput(display, curFocus, KeyPressMask|KeyReleaseMask|FocusChangeMask);
+        }
+    }
+
+    /* close connection to server */
+    XCloseDisplay(display);
+ 
+    return 0;
+}
