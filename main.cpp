@@ -1,24 +1,53 @@
 #include <X11/Xlib.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
 #include <iostream>
 #include <vector>
+#include "X11/keysym.h"
+#include <chrono>
+// extern "C" {
+//     #include <xdo.h>
+// }
 
-struct timeval tp;
-long int ms;
-int last_change;
-std::vector<int> keyArray;
+auto last_change = std::chrono::high_resolution_clock::now();
+auto now = std::chrono::high_resolution_clock::now();
+std::vector<XEvent> keyArray;
+std::vector<XEvent> keyArray_prev;
+// xdo_t * x = xdo_new(":0.0");
+Display *display = XOpenDisplay(getenv("DISPLAY"));
 
-int getTime(){
-    gettimeofday(&tp, NULL);
-    ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    return ms;
+void writeToFile(){
+    printf("%i\n", keyArray_prev.size());
+    FILE *outFile = fopen("/tmp/recording", "a");
+    now = std::chrono::high_resolution_clock::now();  
+    if (keyArray.empty()){
+        fprintf(outFile, "%i\n", std::chrono::duration_cast<std::chrono::microseconds>(now - last_change));
+        fflush(outFile);
+    }
+
+    fprintf(outFile, "%i\n", std::chrono::duration_cast<std::chrono::microseconds>(now - last_change));
+    fflush(outFile);
+
+    for (size_t i = 0; i < keyArray.size(); i++)
+    {
+        KeySym ks = XKeycodeToKeysym(display, keyArray[i].xkey.keycode, 1);
+        if (i == keyArray.size() - 1){
+            fprintf(outFile, "%s\n", XKeysymToString(ks));
+        } else {
+            fprintf(outFile, "%s,", XKeysymToString(ks));
+        }
+        fflush(outFile);
+    }
+    last_change = now;
+
 }
 
 int main()
 {
-    Display *display = XOpenDisplay(getenv("DISPLAY"));
+    // while(1) {
+        // xdo_send_keysequence_window_down(x, CURRENTWINDOW, "A", 0);
+    // }
+
     Window window;
     XEvent event;
     Window root = DefaultRootWindow(display);
@@ -29,40 +58,33 @@ int main()
     XGetInputFocus (display, &curFocus, &revert);
     XSelectInput(display, curFocus, KeyPressMask | KeyReleaseMask | FocusChangeMask);
  
-    /* map (show) the window */
- 
+    
     /* event loop */
     while (1)
-    {
-        for (size_t i = 0; i < keyArray.size(); i++)
-        {
-            printf("%i ", keyArray[i] );
-            if (i == keyArray.size() - 1)
-                printf("\n");
-        }
-        
-        
+    {   
+        keyArray_prev = keyArray;
+        now = std::chrono::high_resolution_clock::now();
+    // auto elapsed = std::chrono::high_resolution_clock::now() - start;
+
+    // long long microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+
         XNextEvent(display, &event);
         /* keyboard events */
         if (event.type == KeyPress)
         {
-            last_change = getTime();
-            keyArray.push_back(event.xkey.keycode);
-            // printf( "KeyPress: %x\n", event.xkey.keycode );
-
-            /* exit on ESC key press */
-            if ( event.xkey.keycode == 0x09 )
-                break;
+            keyArray.push_back(event);
+            printf( "KeyPress: %x\n", event.xkey.keycode );
+            writeToFile();
         }
         else if (event.type == KeyRelease)
         {
-            last_change = getTime();
             for (size_t i = 0; i < keyArray.size(); i++)
             {
-                if (keyArray[i] == event.xkey.keycode)
+                if (keyArray[i].xkey.keycode == event.xkey.keycode)
                     keyArray.erase(keyArray.begin() + i);
             }
-            // printf( "KeyRelease: %x\n", event.xkey.keycode );
+            printf( "KeyRelease: %x\n", event.xkey.keycode );
+            writeToFile();
         }
         else if (event.type == FocusOut)
         {
@@ -74,6 +96,7 @@ int main()
                 if (curFocus == PointerRoot)
                     curFocus = root;
                 XSelectInput(display, curFocus, KeyPressMask|KeyReleaseMask|FocusChangeMask);
+                
         }
     }
 
